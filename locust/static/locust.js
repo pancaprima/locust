@@ -65,10 +65,9 @@ var alternate = false;
 $("ul.tabs").tabs("div.panes > div").on("onClick", function(event) {
     if (event.target == $(".chart-tab-link")[0]) {
         // trigger resizing of charts
-        rpsChart.resize();
-        responseTimeChart.resize();
-        usersChart.resize();
-        failureChart.resize();
+        for (var chartKey in totalCharts) {
+          totalCharts[chartKey].resize()
+        }
         for (var chartKey in endpointResponseTimeCharts) {
           endpointResponseTimeCharts[chartKey].resize();
           endpointRpsCharts[chartKey].resize();
@@ -145,11 +144,37 @@ $(".stats_label").click(function(event) {
     $('#errors tbody').jqoteapp(errors_tpl, (report.errors).sort(sortBy(sortAttribute, desc)));
 });
 
+$("#charts-download").click(function(event) {
+    event.preventDefault();
+    var images = [];
+
+    for (var chartKey in totalCharts) {
+      images[chartKey] = totalCharts[chartKey].toImage()
+    }
+    for (var chartKey in endpointResponseTimeCharts) {
+      images[chartKey + "_responseTime"] = endpointResponseTimeCharts[chartKey].toImage()
+      images[chartKey + "_rps"] = endpointRpsCharts[chartKey].toImage()
+      images[chartKey + "_failure"] = endpointFailureCharts[chartKey].toImage()
+    }
+
+    var zip = new JSZip();
+    var dir = zip.folder("charts");
+    for (var key in images) {
+      dir.file(key.replace(/\//g,"_")+".png", images[key], {base64: true});
+    }
+    zip.generateAsync({type:"blob"})
+      .then(function(content) {
+          // Force down of the Zip file
+          saveAs(content, "charts.zip");
+      })
+});
+
 // init charts
-var rpsChart = new LocustLineChart($(".charts-container"), "Total Requests per Second", "", ["Total"], "reqs/s", "100%");
-var responseTimeChart = new LocustLineChart($(".charts-container"), "Average Response Time", "", ["Total Average"], "ms", "100%");
-var usersChart = new LocustLineChart($(".charts-container"), "Number of Users", "", ["Total"], "users", "100%");
-var failureChart = new LocustLineChart($(".charts-container"), "Number of Failures", "", ["Total"], "failures", "100%");
+var totalCharts = []
+totalCharts['rpsChart'] = new LocustLineChart($(".charts-container"), "Total Requests per Second", "", ["Total"], "reqs/s", "100%");
+totalCharts['responseTimeChart'] = new LocustLineChart($(".charts-container"), "Average Response Time", "", ["Total Average"], "ms", "100%");
+totalCharts['usersChart'] = new LocustLineChart($(".charts-container"), "Number of Users", "", ["Total"], "users", "100%");
+totalCharts['failureChart'] = new LocustLineChart($(".charts-container"), "Number of Failures", "", ["Total"], "failures", "100%");
 var endpointResponseTimeCharts = []
 var endpointRpsCharts = []
 var endpointFailureCharts = []
@@ -197,10 +222,10 @@ function updateStats() {
               responseTimeValues.push(report.stats[i].avg_response_time)
               failureValues.push(report.stats[i].num_failures)
             }
-            failureChart.addValue(failureValues);
-            rpsChart.addValue(rpsValues);
-            responseTimeChart.addValue(responseTimeValues);
-            usersChart.addValue([report.user_count]);
+            totalCharts['failureChart'].addValue(failureValues);
+            totalCharts['rpsChart'].addValue(rpsValues);
+            totalCharts['responseTimeChart'].addValue(responseTimeValues);
+            totalCharts['usersChart'].addValue([report.user_count]);
         }
 
         setTimeout(updateStats, 2000);
@@ -233,9 +258,9 @@ function createEndpointCharts(chartKey, callback) {
     endpointFailureCharts[chartKey] = new LocustLineChart($(".charts-container"), title, chartKey, ["Failure"], "failure", "33.3%");
     endpointFailureCharts[chartKey].resize()
   }
-  if(!rpsChart.isLineExist(chartKey)) rpsChart.addLine(chartKey);
-  if(!responseTimeChart.isLineExist(chartKey)) responseTimeChart.addLine(chartKey);
-  if(!failureChart.isLineExist(chartKey)) failureChart.addLine(chartKey);
+  if(!totalCharts['rpsChart'].isLineExist(chartKey)) totalCharts['rpsChart'].addLine(chartKey);
+  if(!totalCharts['responseTimeChart'].isLineExist(chartKey)) totalCharts['responseTimeChart'].addLine(chartKey);
+  if(!totalCharts['failureChart'].isLineExist(chartKey)) totalCharts['failureChart'].addLine(chartKey);
 
   callback(chartKey)
 }

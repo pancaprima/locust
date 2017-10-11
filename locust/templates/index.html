@@ -168,6 +168,7 @@
                     </table>
                 </div>
                 <div id="charts" style="display:none;">
+                    <a href="#" id="charts-download">Download charts</a>
                     <div class="charts-container"></div>
                     <p class="note">Note: There is no persistence of these charts, if you refresh this page, new charts will be created.</p>
                 </div>
@@ -199,6 +200,7 @@
                         <a href="/stats/distribution/csv">Download response time distribution CSV</a><br>
                         <a href="/exceptions/csv">Download exceptions CSV</a>
                     </div>
+                    <div id="charts-image"></div>
                 </div>
             </div>
         </div>
@@ -291,6 +293,8 @@
         ]]>
     </script>
     <script type="text/javascript" src="/static/chart.js?v={{ version }}"></script>
+    <script type="text/javascript" src="/static/jszip.min.js"></script>
+    <script type="text/javascript" src="/static/filesaver.min.js"></script>
     <script type="text/javascript" src="/static/locust.js?v={{ version }}"></script>
     <script type="text/javascript" src="/static/timer.js"></script>
 

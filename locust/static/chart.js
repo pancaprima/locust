@@ -123,6 +123,13 @@
         resize() {
             this.chart.resize();
         }
+
+        toImage() {
+          var src = this.chart.getDataURL({
+              pixelRatio: 2
+          });
+          return src.split(",",2)[1]
+        }
     }
     window.LocustLineChart = LocustLineChart;
 })();
