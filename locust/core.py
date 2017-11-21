@@ -226,7 +226,8 @@ class TaskSet(object):
     def __init__(self, parent):
         self._task_queue = []
         self._time_start = time()
-        
+        self._task_time_start = None
+
         if isinstance(parent, TaskSet):
             self.locust = parent.locust
         elif isinstance(parent, Locust):
@@ -264,6 +265,7 @@ class TaskSet(object):
                     self.schedule_task(self.get_next_task())
                 
                 try:
+                    self._task_time_start = time()
                     self.execute_next_task()
                 except RescheduleTaskImmediately:
                     pass
@@ -325,7 +327,7 @@ class TaskSet(object):
         return random.choice(self.tasks)
     
     def wait(self):
-        millis = random.randint(self.min_wait, self.max_wait)
+        millis  = max(1, (self.max_wait - ((time() - self._task_time_start)*1000)))
         seconds = millis / 1000.0
         self._sleep(seconds)
 
