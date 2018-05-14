@@ -392,14 +392,19 @@ def expected_response(json_dumps):
 
 @app.route("/config/save_json", methods=["POST"])
 def save_json():
+    logger.info("request to save json")
     assert request.method == "POST"
     config_json = str(request.form["final_json"])
 
     try:
+        logger.info("try to write file")
         success, message =  fileio.write(configuration.CONFIG_PATH, config_json)
+        logger.info("writing file succeed, updating slaves")
         events.master_new_configuration.fire(new_config=config_json)
+        logger.info("updating slaves done")
         response = make_response(json.dumps({'success':success, 'message': message}))
     except Exception as err:
+        logger.info(err)
         response = make_response(json.dumps({'success':success, 'message': message}))
 
     response.headers["Content-type"] = "application/json"
