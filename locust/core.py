@@ -5,6 +5,8 @@ import traceback
 from time import time
 
 import gevent
+from . import runners
+from gevent import monkey, GreenletExit
 import six
 
 from gevent import GreenletExit, monkey
@@ -17,6 +19,7 @@ monkey.patch_all()
 
 from . import events
 from .clients import HttpSession
+from .configuration import ClientConfiguration
 from .exception import (InterruptTaskSet, LocustError, RescheduleTask,
                         RescheduleTaskImmediately, StopLocust)
 
@@ -99,8 +102,8 @@ class Locust(object):
     client = NoClientWarningRaiser()
     _catch_exceptions = True
     
-    def __init__(self):
-        super(Locust, self).__init__()
+    def __init__(self, runner=None):
+        self.runner = runner
     
     def run(self):
         try:
@@ -128,8 +131,8 @@ class HttpLocust(Locust):
     The client support cookies, and therefore keeps the session between HTTP requests.
     """
     
-    def __init__(self):
-        super(HttpLocust, self).__init__()
+    def __init__(self, runner=None):
+        super(HttpLocust, self).__init__(runner=runner)
         if self.host is None:
             raise LocustError("You must specify the base host. Either in the host attribute in the Locust class, or on the command line using the --host option.")
         
@@ -227,6 +230,9 @@ class TaskSet(object):
     instantiated. Useful for nested TaskSet classes.
     """
 
+    config = None
+    """Will refer to the ClientConfiguration class instance when the TaskSet has been instantiated"""
+
     def __init__(self, parent):
         self._task_queue = []
         self._time_start = time()
@@ -239,7 +245,8 @@ class TaskSet(object):
             raise LocustError("TaskSet should be called with Locust instance or TaskSet instance as first argument")
 
         self.parent = parent
-        
+        self.config = ClientConfiguration()
+
         # if this class doesn't have a min_wait or max_wait defined, copy it from Locust
         if not self.min_wait:
             self.min_wait = self.locust.min_wait
@@ -356,3 +363,18 @@ class TaskSet(object):
         Locust instance.
         """
         return self.locust.client
+
+    @property
+    def configuration(self):
+        """
+        Reference to configuration.py
+        """
+        return self.config.read_json()
+
+    @property
+    def runners(self):
+        """
+        Reference to runners.py
+        """
+        return runners.locust_runner
+

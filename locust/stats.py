@@ -33,6 +33,7 @@ class RequestStats(object):
         self.max_requests = None
         self.last_request_timestamp = None
         self.start_time = None
+        self.run_time = 0
     
     def get(self, name, method):
         """
@@ -75,6 +76,20 @@ class RequestStats(object):
         self.max_requests = None
         self.last_request_timestamp = None
         self.start_time = None
+
+    def total_run_time(self):
+        # return the time that the test has been running for.
+        if self.start_time is None:
+            self.run_time = 0
+        else:
+            self.run_time = int(time.time() - self.start_time)
+
+    @classmethod
+    def sum_stats(cls, name="Total", full_request_history=False):
+        stats = RequestStats(None, name)
+        for s in cls.requests.itervalues():
+            stats.iadd_stats(s, full_request_history)
+        return stats
         
 
 class StatsEntry(object):
@@ -185,7 +200,7 @@ class StatsEntry(object):
         self.response_times.setdefault(rounded_response_time, 0)
         self.response_times[rounded_response_time] += 1
 
-    def log_error(self, error):
+    def log_error(self, response_time, error):
         self.num_failures += 1
         self.stats.num_failures += 1
         key = StatsError.create_key(self.method, self.name, error)
@@ -195,11 +210,16 @@ class StatsEntry(object):
             self.stats.errors[key] = entry
 
         entry.occured()
+        self.stats.num_requests += 1
+        self.num_requests += 1
+
+        self._log_time_of_request()
+        self._log_response_time(response_time)
 
     @property
     def fail_ratio(self):
         try:
-            return float(self.num_failures) / (self.num_requests + self.num_failures)
+            return float(self.num_failures) / (self.num_requests)
         except ZeroDivisionError:
             if self.num_failures > 0:
                 return 1.0
@@ -226,7 +246,7 @@ class StatsEntry(object):
             return 0
         slice_start_time = max(self.stats.last_request_timestamp - 12, int(self.stats.start_time or 0))
 
-        reqs = [self.num_reqs_per_sec.get(t, 0) for t in range(slice_start_time, self.stats.last_request_timestamp-2)]
+        reqs = [self.num_reqs_per_sec.get(t,0) for t in range(slice_start_time, self.stats.last_request_timestamp-2)]
         return avg(reqs)
 
     @property
@@ -256,7 +276,6 @@ class StatsEntry(object):
         """
         self.last_request_timestamp = max(self.last_request_timestamp, other.last_request_timestamp)
         self.start_time = min(self.start_time, other.start_time)
-
         self.num_requests = self.num_requests + other.num_requests
         self.num_failures = self.num_failures + other.num_failures
         self.total_response_time = self.total_response_time + other.total_response_time
@@ -319,7 +338,7 @@ class StatsEntry(object):
 
     def __str__(self):
         try:
-            fail_percent = (self.num_failures/float(self.num_requests + self.num_failures))*100
+            fail_percent = (self.num_failures/float(self.num_requests))*100
         except ZeroDivisionError:
             fail_percent = 0
         
@@ -440,12 +459,12 @@ A global instance for holding the statistics. Should be removed eventually.
 
 def on_request_success(request_type, name, response_time, response_length):
     global_stats.get(name, request_type).log(response_time, response_length)
-    if global_stats.max_requests is not None and (global_stats.num_requests + global_stats.num_failures) >= global_stats.max_requests:
+    if global_stats.max_requests is not None and global_stats.num_requests >= global_stats.max_requests:
         raise StopLocust("Maximum number of requests reached")
 
 def on_request_failure(request_type, name, response_time, exception):
-    global_stats.get(name, request_type).log_error(exception)
-    if global_stats.max_requests is not None and (global_stats.num_requests + global_stats.num_failures) >= global_stats.max_requests:
+    global_stats.get(name, request_type).log_error(response_time, exception)
+    if global_stats.max_requests is not None and global_stats.num_requests >= global_stats.max_requests:
         raise StopLocust("Maximum number of requests reached")
 
 def on_report_to_master(client_id, data):

@@ -14,9 +14,11 @@ from gevent.pool import Group
 
 from six.moves import xrange
 
-from . import events
+from . import events, configuration
 from .rpc import Message, rpc
 from .stats import global_stats
+import fileio
+import tests_loader
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,14 @@ locust_runner = None
 
 STATE_INIT, STATE_HATCHING, STATE_RUNNING, STATE_STOPPED = ["ready", "hatching", "running", "stopped"]
 SLAVE_REPORT_INTERVAL = 3.0
-
+NORMAL, RAMP = ["Normal", "Auto"]
 
 class LocustRunner(object):
-    def __init__(self, locust_classes, options):
+    client_index = 0
+    def __init__(self, locust_classes, options, available_locustfiles=None):
         self.options = options
         self.locust_classes = locust_classes
+        self.available_locustfiles = available_locustfiles or {}
         self.hatch_rate = options.hatch_rate
         self.num_clients = options.num_clients
         self.num_requests = options.num_requests
@@ -40,11 +44,12 @@ class LocustRunner(object):
         self.hatching_greenlet = None
         self.exceptions = {}
         self.stats = global_stats
-        
+        self.running_type = NORMAL
+
         # register listener that resets stats when hatching is complete
         def on_hatch_complete(user_count):
             self.state = STATE_RUNNING
-            if not self.options.no_reset_stats:
+            if self.options.reset_stats:
                 logger.info("Resetting stats\n")
                 self.stats.reset_all()
         events.hatch_complete += on_hatch_complete
@@ -114,7 +119,7 @@ class LocustRunner(object):
                 occurence_count[locust.__name__] += 1
                 def start_locust(_):
                     try:
-                        locust().run()
+                        locust(self).run()
                     except GreenletExit:
                         pass
                 new_locust = self.locusts.spawn(start_locust, locust)
@@ -145,6 +150,17 @@ class LocustRunner(object):
         for g in dying:
             self.locusts.killone(g)
         events.hatch_complete.fire(user_count=self.num_clients)
+
+    def select_file(self, key):
+        """
+            Set the active locust classes to the executeables described by the key
+        """
+        try:
+            self.locust_classes = self.available_locustfiles[key].values()
+            events.locust_switch_file.fire(locust_classes_key=key)
+        except KeyError:
+            logger.error("No available locust classes found with key: {}".format(key))
+            self.locust_classes = []
 
     def start_hatching(self, locust_count=None, hatch_rate=None, wait=False):
         if self.state != STATE_RUNNING and self.state != STATE_HATCHING:
@@ -190,11 +206,13 @@ class LocustRunner(object):
         row["count"] += 1
         row["nodes"].add(node_id)
         self.exceptions[key] = row
+    
+    def reload_tests(self):
+        self.available_locustfiles = tests_loader.load(self.options.locustfile)
 
 class LocalLocustRunner(LocustRunner):
-    def __init__(self, locust_classes, options):
-        super(LocalLocustRunner, self).__init__(locust_classes, options)
-
+    def __init__(self, locust_classes, options, available_locustfiles=None):
+        super(LocalLocustRunner, self).__init__(locust_classes, options, available_locustfiles)
         # register listener thats logs the exception for the local runner
         def on_locust_error(locust_instance, exception, tb):
             formatted_tb = "".join(traceback.format_tb(tb))
@@ -206,8 +224,8 @@ class LocalLocustRunner(LocustRunner):
         self.greenlet = self.hatching_greenlet
 
 class DistributedLocustRunner(LocustRunner):
-    def __init__(self, locust_classes, options):
-        super(DistributedLocustRunner, self).__init__(locust_classes, options)
+    def __init__(self, locust_classes, options, available_locustfiles=None):
+        super(DistributedLocustRunner, self).__init__(locust_classes, options, available_locustfiles)
         self.master_host = options.master_host
         self.master_port = options.master_port
         self.master_bind_host = options.master_bind_host
@@ -262,6 +280,27 @@ class MasterLocustRunner(DistributedLocustRunner):
             self.quit()
         events.quitting += on_quitting
     
+        def on_locust_switch_file(locust_classes_key):
+            for client in six.itervalues(self.clients):
+                self.server.send(Message("switch", locust_classes_key, None))
+        events.locust_switch_file += on_locust_switch_file
+
+        def on_master_new_configuration(new_config):
+            logger.info("report slaves to update their config")
+            data =  {
+                        'config':new_config
+                    }
+            for client in six.itervalues(self.clients):
+                self.server.send(Message("config", data, None))
+        events.master_new_configuration += on_master_new_configuration
+
+        def on_master_new_file_uploaded(new_file):
+            logger.info("master has been received a new test file, slaves should update theirs too")
+            self.reload_tests()
+            for client in six.itervalues(self.clients):
+                self.server.send(Message("python_file", new_file, None))
+        events.master_new_file_uploaded += on_master_new_file_uploaded
+
     @property
     def user_count(self):
         return sum([c.user_count for c in six.itervalues(self.clients)])
@@ -284,15 +323,17 @@ class MasterLocustRunner(DistributedLocustRunner):
             self.stats.clear_all()
             self.exceptions = {}
             events.master_start_hatching.fire()
-        
-        for client in six.itervalues(self.clients):
+
+        for client_index, client in enumerate(six.itervalues(self.clients)):
             data = {
                 "hatch_rate":slave_hatch_rate,
                 "num_clients":slave_num_clients,
                 "num_requests": self.num_requests,
                 "host":self.host,
-                "stop_timeout":None
+                "stop_timeout":None,
+                "client_index": client_index,
             }
+            logger.info("Client index number %s is ready." % (client_index))
 
             if remaining > 0:
                 data["num_clients"] += 1
@@ -392,6 +433,7 @@ class SlaveLocustRunner(DistributedLocustRunner):
                 #self.num_clients = job["num_clients"]
                 self.num_requests = job["num_requests"]
                 self.host = job["host"]
+                self.client_index = job["client_index"]
                 self.hatching_greenlet = gevent.spawn(lambda: self.start_hatching(locust_count=job["num_clients"], hatch_rate=job["hatch_rate"]))
             elif msg.type == "stop":
                 self.stop()
@@ -401,6 +443,21 @@ class SlaveLocustRunner(DistributedLocustRunner):
                 logger.info("Got quit message from master, shutting down...")
                 self.stop()
                 self.greenlet.kill(block=True)
+            elif msg.type == "switch":
+                logger.info("Test file switch to %s", self.available_locustfiles[msg.data].values())
+                self.locust_classes = self.available_locustfiles[msg.data].values()
+            elif msg.type == "config":
+                logger.info("Got new config from master, updating this slave config")
+                fileio.write(configuration.CONFIG_PATH, msg.data['config'])
+                events.master_new_configuration.fire(new_config=msg.data['config'])
+            elif msg.type == "python_file":
+                logger.info("Uploaded test file from master detected, writing now")
+                new_file = msg.data
+                upload_status,upload_message = fileio.write(new_file['full_path'], new_file['content'])
+                if upload_status is False :
+                    logger.info("error while creating new file: " + upload_message)
+                self.reload_tests()
+
 
     def stats_reporter(self):
         while True:
