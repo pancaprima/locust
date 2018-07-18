@@ -12,7 +12,8 @@ class ClientConfiguration:
     This class is a handler for data configuration with JSON data structure.
     """
 
-    config_data = None
+    def __init__(self):
+        self.config_data = None
 
     def read_json(self, path=None):
         """
@@ -22,6 +23,11 @@ class ClientConfiguration:
         if self.config_data is None:
             if path is None:
                 path = CONFIG_PATH
+            else :
+                if path.startswith('./') :
+                    path = path[1:]
+                elif not path.startswith('/'):
+                    path = '/%s' % (path)
             try:
                 with open((os.environ['PYTHONPATH'].split(os.pathsep))[-1] + path, "r") as data_file:
                     self.config_data = json.load(data_file)
