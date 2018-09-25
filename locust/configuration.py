@@ -5,7 +5,7 @@ from ast import literal_eval
 from flask import make_response
 
 logger = logging.getLogger(__name__)
-CONFIG_PATH = '/tests/settings/config.json'
+CONFIG_PATH = '/squads/config.json'
 
 class ClientConfiguration:
     """
@@ -68,6 +68,20 @@ class ClientConfiguration:
         
         return make_response(json.dumps({'success':True, 'data':json.dumps(data, indent=4)}))
         
+    def collect_config_path(self, os_path, working_dir):
+        """
+        Collect configuration files path (files with .json extension) under specified path and return it.
+        """
+        collected = dict()
+        for root, dirs, files in os.walk(os_path+working_dir):
+            if files:
+                for file_ in files:
+                    if file_.endswith('.json'):
+                        full_path = os.path.abspath(os.path.join(root, file_))
+                        truncated_path = full_path.replace(os_path+working_dir, "")
+                        collected.update({full_path.replace(os_path, ""):full_path.replace(os_path+working_dir, "")})
+        return collected
+    
     @classmethod    
     def get_path(self, match):
         """

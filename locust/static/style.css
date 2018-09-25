@@ -302,9 +302,49 @@ label[for="json_option"]+div{
     padding: 6px 15px 6px 0px !important;
 }
 
+.select2-results__option--highlighted[aria-selected]{
+    color: black !important;
+}
+
 #add-new-file-modal .select2-selection--single {
     width: 100%;
 }
+
+#load_config_form > .select2-container, #csv_file{
+    width: 328px !important;
+    float: left;
+    padding-top: 13px;
+}
+
+#load_config_form, #import_csv_form{ 
+    overflow: hidden !important;
+}
+
+#load_config_form > label{
+    float: left !important;
+    width: 190px;
+}
+
+#load_config_btn {
+    height: 36px;
+    width: 70px;
+    margin-left: 5px;
+    margin-top: 13px;
+}
+
+#import_csv_form > label {
+    float: left !important;
+    width: 100px;
+}
+
+#csv_file {
+    padding-top: 18px;
+}
+
+#import_csv_btn {
+    margin-top: 18px;
+}
+
 
 .start button,
 .edit button, .edit_config button[type=submit], .multiple_column button, 
@@ -325,9 +365,9 @@ label[for="json_option"]+div{
     top: -53px;
 }
 
-#submit_json_btn{
+#save_config_btn{
     position: absolute;
-    top: 8px;
+    top: 100px;
     right: 10px;
 }
 

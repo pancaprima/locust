@@ -65,7 +65,10 @@ def index():
     modules = tests_loader.populate_directories(fileio.os_path(),'tests/modules/')
     modules.update(pages)
     directories = modules
-    all_directories = tests_loader.populate_directories(fileio.os_path(),'tests/')
+    # all_directories = tests_loader.populate_directories(fileio.os_path(),'tests/')
+    
+    cc = configuration.ClientConfiguration()
+    available_config_files = cc.collect_config_path(fileio.os_path(),'squads/')
 
     return render_template("index.html",
         state=runners.locust_runner.state,
@@ -74,7 +77,8 @@ def index():
         user_count=runners.locust_runner.user_count,
         available_locustfiles = sorted(runners.locust_runner.available_locustfiles.keys()),
         test_file_directories = sorted(directories),
-        all_test_file_directories = sorted(all_directories),
+        # all_test_file_directories = sorted(all_directories),
+        available_config_files = available_config_files,
         version=version,
         ramp = _ramp,
         host=host
@@ -255,10 +259,9 @@ def ramp():
     response.headers["Content-type"] = "application/json"
     return response
 
-
 @app.route("/config/get_config_content", methods=["GET"])
 def get_config_content():
-    load_config = fileio.read(configuration.CONFIG_PATH)
+    load_config = fileio.read(request.args.get("path"))
     response = make_response(json.dumps({'data':load_config}))
     response.headers["Content-type"] = "application/json"
     return response
@@ -350,11 +353,12 @@ def expected_response(json_dumps):
 @app.route("/config/save_json", methods=["POST"])
 def save_json():
     assert request.method == "POST"
-    config_json = str(request.form["final_json"])
+    config_content = str(request.form["final_config"])
+    config_path = request.form["config_path"]
 
     try:
-        success, message =  fileio.write(configuration.CONFIG_PATH, config_json)
-        events.master_new_configuration.fire(new_config=config_json)
+        success, message =  fileio.write(config_path, config_content)
+        events.master_new_configuration.fire(new_config=config_content)
         response = make_response(json.dumps({'success':success, 'message': message}))
     except Exception as err:
         response = make_response(json.dumps({'success':success, 'message': message}))

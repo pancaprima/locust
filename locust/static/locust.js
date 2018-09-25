@@ -148,31 +148,24 @@ var old_config;
 
 $(".edit_config_link").click(function(event) {
     event.preventDefault();
-    try{
-        $.ajax({
-            type: "GET",
-            url: "/config/get_config_content",
-            success: function(response){
-                old_config = JSON.parse(response.data)
-                json_editor.set(old_config);
-                $("#hidden_config_json").val(response.data);
-                $("#start").hide();
-                $("#ramp").hide();
-                $("#edit_config").show();
-                $(".status").addClass("none");
-                $("#config_tab").trigger("click");
-            }
-        }); 
-    }
-    catch(err){
-        alert("Failed to load configuration data.\n\nOriginal error message:\n" + err);
-    }
-    
+    loadConfig();
 });
 
 $("#directories .select2").select2({
     placeholder: "Select a state"
 });
+
+$('#load_config_btn').click(function(){
+    event.preventDefault();
+    if(checkConfigChanges()) {
+        $("#not_save_json_btn").attr("data-origin-link", "load config");
+        $("#save_json_btn").attr("data-origin-link", "load config");
+        $("#modal_confirm_save_json").modal();
+    }
+    else{
+        loadConfig();
+    }
+})
 
 let whichform = $('.upload_file_form_test_file')[0];
 
@@ -182,11 +175,11 @@ $('#upload_py_submit').click(function(event){
     $('.upload_file_form_test_file').submit();
 });
 
-$('#upload_json_submit').click(function(event){
-    event.preventDefault();
-    whichform = $('.upload_file_form_json')[0];
-    $('.upload_file_form_json').submit();
-});
+// $('#upload_json_submit').click(function(event){
+//     event.preventDefault();
+//     whichform = $('.upload_file_form_json')[0];
+//     $('.upload_file_form_json').submit();
+// });
 
 $('.upload_file_form_test_file, .upload_file_form_json').submit(function(event) {
     event.preventDefault();
@@ -209,7 +202,7 @@ $('.upload_file_form_test_file, .upload_file_form_json').submit(function(event) 
     })
 });
 
-$('#submit_json_btn').click(function(){
+$('#save_config_btn').click(function(){
     event.preventDefault();
     $('#hidden_config_json').val(JSON.stringify(json_editor.get(), null , 4));
     $('#json_config_form').submit();
@@ -325,8 +318,9 @@ $('#convert_csv_btn').click(function(){
 
 $(".config_new_test").click(function(event) {
     event.preventDefault();
-    if(JSON.stringify(old_config,null,4) != JSON.stringify(json_editor.get(),null,4)) {
+    if(checkConfigChanges()) {
         $("#not_save_json_btn").attr("data-origin-link", "new test");
+        $("#save_json_btn").attr("data-origin-link", "new test");
         $("#modal_confirm_save_json").modal();
     }
     else {
@@ -340,8 +334,9 @@ $(".config_new_test").click(function(event) {
 
 $(".config_ramp_test").click(function(event) {
     event.preventDefault();
-    if(JSON.stringify(old_config,null,4) != JSON.stringify(json_editor.get(),null,4)) {
+    if(checkConfigChanges()) {
         $("#not_save_json_btn").attr("data-origin-link", "new ramp");
+        $("#save_json_btn").attr("data-origin-link", "new ramp");
         $("#modal_confirm_save_json").modal();
     }
     else {
@@ -353,26 +348,98 @@ $(".config_ramp_test").click(function(event) {
     }
 });
 
-
+// if user click save button on unsaved configuration warning modal
 $("#save_json_btn").click(function(event) {
-    $("#submit_json_btn").trigger("click");
+    if($("#save_json_btn").attr("data-origin-link") == "load config"){
+        saveConfigWithoutRefresh();
+        loadConfig();
+    }
+    else {
+        $("#save_config_btn").trigger("click");
+    }
 });
 
+// if user click don't save button on unsaved configuration warning modal
 $("#not_save_json_btn").click(function(event) {
     $("#modal_confirm_save_json").modal("hide");
-    if($("#not_save_json_btn").attr("data-origin-link") == "new test") {
-        $("#start").show();
-        $("#ramp").hide();
+
+    if($("#not_save_json_btn").attr("data-origin-link") == "load config"){
+        loadConfig();
     }
-    else if($("#not_save_json_btn").attr("data-origin-link") == "new ramp") {
-        $("#ramp").show();
-        $("#start").hide();
+    else{
+        // if before warning modal appear, user click new test link
+        if($("#not_save_json_btn").attr("data-origin-link") == "new test") {
+            $("#start").show();
+            $("#ramp").hide();
+        }
+        // if before warning modal appear, user click new ramp link
+        else if($("#not_save_json_btn").attr("data-origin-link") == "new ramp") {
+            $("#ramp").show();
+            $("#start").hide();
+        }
+        $("#edit_config").hide();
+        $("#locust_count").focus().select();
+        $(".status").removeClass("none");
     }
-    $("#edit_config").hide();
-    $("#locust_count").focus().select();
-    $(".status").removeClass("none");
 });
 
+// to display selected config's content into editor
+function loadConfig(){
+    try{
+        $.ajax({
+            type: "GET",
+            url: "/config/get_config_content",
+            data: {
+                "path": $("#select_config_options option:selected").val()
+            },
+            success: function(response){
+                old_config = JSON.parse(response.data)
+                json_editor.set(old_config);
+                $("#hidden_config_json").val(response.data);
+                $("#hidden_config_path").val($("#select_config_options option:selected").val());
+                $("#active_config_path").text($("#select_config_options option:selected").text())
+                $("#start").hide();
+                $("#ramp").hide();
+                $("#edit_config").show();
+                $(".status").addClass("none");
+                $("#config_tab").trigger("click");
+            }
+        }); 
+    }
+    catch(err){
+        alert("Failed to load configuration data.\n\nOriginal error message:\n" + err);
+    }
+}
+
+// to check if there are any changes from the configuration content
+function checkConfigChanges(){
+    return JSON.stringify(old_config,null,4) != JSON.stringify(json_editor.get(),null,4);
+}
+
+// save configuration without refreshing the page
+function saveConfigWithoutRefresh(){
+    $("#modal_confirm_save_json").modal("hide");
+    $('#hidden_config_json').val(JSON.stringify(json_editor.get(), null , 4));
+    var form = $('#json_config_form')[0];
+    var form_data = new FormData(form);
+    try{
+        $.ajax({
+            type: "POST",
+            url: "/config/save_json",
+            data: form_data,
+            enctype: "multipart/form-data",
+            contentType: false,
+            cache: false,
+            processData: false,
+            success: function(response){
+                alert("Changes has been saved");
+            }
+        });
+    }
+    catch(err){
+        alert("Failed to save configuration. \n\nOriginal error message:\n" + err);
+    }
+}
 
 /* END OF CONFIGURATION SECTION */
 

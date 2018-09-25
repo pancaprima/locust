@@ -81,13 +81,13 @@
                     <input type="hidden" name="type_swarm" value="start">
                     <label for="locustfile">Locust file to execute</label>
                     <div class="input-group">
-                    <select name="locustfile" id="locustfile" class="select2 select2-hidden-accessible select2-start-width" placeholder="Select type">
-                        <option value="" disabled selected>Select/Upload a test file</option>
-                        <option value="add_new_test_file">Upload test file</option>
-                        {% for name in available_locustfiles %}
-                            <option value="{{name}}">{{name}}</option>
-                        {% endfor %}
-                    </select>
+                        <select name="locustfile" id="locustfile" class="select2 select2-hidden-accessible select2-start-width" placeholder="Select type">
+                            <option value="" disabled selected>Select/Upload a test file</option>
+                            <option value="add_new_test_file">Upload test file</option>
+                            {% for name in available_locustfiles %}
+                                <option value="{{name}}">{{name}}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <br>
                     <a href="#" class="edit_config_link">Edit Config</a>
@@ -230,7 +230,7 @@
         <div class="edit_config" id="edit_config" style="display:none;">
             <div class="head_section">
                 <div class="container">
-                    <div class="title_header">Main Configuration</div>
+                    <div class="title_header">Configuration</div>
                     <ul id="link_navigation">
                         <li><a href="#" class="config_new_test">New Test</a></li>
                         {% if ramp %}
@@ -239,52 +239,46 @@
                     </ul>
                 </div>
             </div>
-
             <div class="custom_padder container body_section">
-                <label>Import CSV</label>
+                <form id="load_config_form">
+                    <label for="">Select configuration file</label>
+                    <select name="select_config_options" id="select_config_options" class="select2 select2-hidden-accessible select2-start-width" placeholder="Select type">
+                        {% for key in available_config_files %}
+                            {% if key == "/squads/config.json" %}
+                                <option value="{{key}}" selected="selected">{{available_config_files[key]}}</option>  
+                            {%  else %}
+                                <option value="{{key}}">{{available_config_files[key]}}</option>
+                            {%  endif %}
+                        {% endfor %}
+                    </select>
+                    <button id="load_config_btn">Load</button>
+                </form>
+                <br/>
                 <form method="POST" enctype="multipart/form-data" id="import_csv_form">
+                    <label>Import CSV</label>
                     <input type="file" accept=".csv" name="csv_file" id="csv_file" />
                     <input type="submit" value="Import" id="import_csv_btn" />
                 </form>
-                <br>
+                <label>Currently reading from: <a id="active_config_path"></a></label>
                 <form action="/config/save_json" method="POST" id="json_config_form">
                     <div id="json_editor" name="json_editor"></div>
-                    <input type="hidden" id="hidden_config_json" name="final_json" value="{{json_config}}">
-                    <button type="submit" id="submit_json_btn">Save</button>
+                    <input type="hidden" id="hidden_config_json" name="final_config" value="{{json_config}}">
+                    <input type="hidden" id="hidden_config_path" name="config_path">
+                    <button type="submit" id="save_config_btn">Save</button>
                 </form>
             </div>
-            <div class="modal fade" id="modal_confirm_save_json" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
-                <div class="modal-dialog" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                            <h5 class="modal-title" id="myModalLabel">Unsaved Configuration</h5>
-                        </div>
-                        <div class="modal-body">
-                            You have unsaved configuration. Do you want to save it?
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                            <button type="button" class="btn btn-default" id="not_save_json_btn" data-origin-link="">Don't Save</button>
-                            <button type="button" class="btn btn-primary" id="save_json_btn">Save</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="custom_padder container body_section">
+            <!-- <div class="custom_padder container body_section">
                 <div class="title_header">Team Configuration</div>
                 <br/>
                 <button type="button" data-toggle="modal" data-target="#upload-json-modal" >Upload JSON</button>
-            </div>
+            </div> -->
         </div>
 
-        <div id="upload-json-modal" class="modal fade" role="dialog">
-            <div class="modal-dialog">
+        <!-- <div id="upload-json-modal" class="modal fade" role="dialog">
+            <div class="modal-dialog"> -->
           
               <!-- Modal content-->
-              <div class="modal-content">
+              <!-- <div class="modal-content">
                 <div class="modal-header">
                   <button type="button" class="close" data-dismiss="modal">&times;</button>
                   <h4 class="modal-title">Upload JSON</h4>
@@ -307,6 +301,27 @@
                     </form>
                 </div>
               </div>
+            </div>
+        </div> -->      
+
+        <div class="modal fade" id="modal_confirm_save_json" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <h5 class="modal-title" id="myModalLabel">Unsaved Configuration</h5>
+                    </div>
+                    <div class="modal-body">
+                        You have unsaved configuration. Do you want to save it?
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-default" id="not_save_json_btn" data-origin-link="">Don't Save</button>
+                        <button type="button" class="btn btn-primary" id="save_json_btn" data-origin-link="">Save</button>
+                    </div>
+                </div>
             </div>
         </div>
 
