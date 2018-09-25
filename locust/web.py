@@ -4,7 +4,7 @@ import csv, re, io, json, os.path, events, logging
 from time import time
 from datetime import datetime, timedelta
 from itertools import chain
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from itertools import chain
 from time import time
 
@@ -61,10 +61,7 @@ def index():
     else:
         edit_label = ""
 
-    pages = tests_loader.populate_directories(fileio.os_path(),'tests/pages/')
-    modules = tests_loader.populate_directories(fileio.os_path(),'tests/modules/')
-    modules.update(pages)
-    directories = modules
+    directories = tests_loader.populate_directories(fileio.os_path(),'squads/')
     # all_directories = tests_loader.populate_directories(fileio.os_path(),'tests/')
     
     cc = configuration.ClientConfiguration()
@@ -78,7 +75,7 @@ def index():
         available_locustfiles = sorted(runners.locust_runner.available_locustfiles.keys()),
         test_file_directories = sorted(directories),
         # all_test_file_directories = sorted(all_directories),
-        available_config_files = available_config_files,
+        available_config_files = OrderedDict(sorted(available_config_files.items())),
         version=version,
         ramp = _ramp,
         host=host
