@@ -386,6 +386,7 @@ $("#not_save_json_btn").click(function(event) {
 // to display selected config's content into editor
 function loadConfig(){
     try{
+        $("#modal_loading").modal();
         $.ajax({
             type: "GET",
             url: "/config/get_config_content",
@@ -402,7 +403,11 @@ function loadConfig(){
                 $("#ramp").hide();
                 $("#edit_config").show();
                 $(".status").addClass("none");
-                $("#config_tab").trigger("click");
+            },
+            complete: function(){
+                setTimeout(function(){
+                    $("#modal_loading").modal("hide");
+                },1000);
             }
         }); 
     }
