@@ -371,7 +371,7 @@ class TaskSet(object):
         """
         return self.config.read_json()
     
-    def team_configuration(self, path):
+    def load_config(self, path):
         """
         Reference to get_team_config func in configuration.py
         """

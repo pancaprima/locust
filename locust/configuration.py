@@ -5,7 +5,7 @@ from ast import literal_eval
 from flask import make_response
 
 logger = logging.getLogger(__name__)
-CONFIG_PATH = '/tests/settings/config.json'
+CONFIG_PATH = '/squads/config.json'
 
 class ClientConfiguration:
     """
